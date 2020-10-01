@@ -1,0 +1,3 @@
+find a pattern in line and print the remaining line afterwards.
+
+cat srikanth-excel.txt   | awk -F 'SystemOwner=' '{print $2}' | awk '{print $1" "$2","}' | head
