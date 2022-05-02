@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# example ./usidfinder_from_sysrpt.sh /opt/config_data/PS_data userid
+
+CONFIGDIR=$1
+USERNAME=$2
+USERID=`adquery user $USERNAME | cut -d ":" -f 3 2>/dev/null`
+FINDING=0
+
+for i in `ls $CONFIGDIR`
+ do
+   FINDING=`cat $CONFIGDIR/$i | grep "$USERID" | grep -v grep | wc -l`
+   if [ $FINDING -ne 0 ]; then
+    echo "Alert:(MSG001): User $USERNAME found on server $i" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> uidfinder_from_config_data.log.txt
+    echo "Alert:(MSG001): User $USERNAME found on server $i"
+   fi
+ done
+
+echo "=============== script completed - end of line ===============" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> userfinder_from_config_data.log.txt
