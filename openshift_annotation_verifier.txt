@@ -1,0 +1,449 @@
+#!/bin/bash
+
+field01=annotations
+field02=labels
+field03=name
+denyfield01=last-applied-configuration
+namespmach=openshift-machine-api
+export dir01=$2
+export dir02=$3
+
+s10=`od -vAn -N2 -tu2 < /dev/urandom`
+
+if [ -z $s11 ]; then
+export s11=`echo $s10`
+fi
+export workdir=workdir-$s11
+
+########################
+config_dump()
+{
+ mkdir $clustername-$clusterversion-$s11
+ mkdir -p $clustername-$clusterversion-$s11/project $clustername-$clusterversion-$s11/node $clustername-$clusterversion-$s11/machine
+ oc get projects -A | grep "Active" | awk '{print $1}' > $clustername-$clusterversion-$s11/all_projects_name.txt
+ oc get nodes | grep -v " ROLES " | awk '{print $1}' > $clustername-$clusterversion-$s11/all_node_name.txt
+ oc get machines -A | grep -v " NAME " | awk '{print $2}' > $clustername-$clusterversion-$s11/all_machine_name.txt
+
+ IFS=''
+ while read line;
+ do
+  oc get project $line -o yaml > $clustername-$clusterversion-$s11/project/$line.project.yaml
+ done < $clustername-$clusterversion-$s11/all_projects_name.txt
+  echo "Projects dumps taken"
+ IFS=''
+ while read line;
+ do
+  oc get node $line -o yaml > $clustername-$clusterversion-$s11/node/$line.node.yaml
+ done < $clustername-$clusterversion-$s11/all_node_name.txt
+  echo "Node dumps taken"
+ IFS=''
+ while read line;
+ do
+  oc get machine $line -n $namespmach -o yaml > $clustername-$clusterversion-$s11/machine/$line.machine.yaml
+ done < $clustername-$clusterversion-$s11/all_machine_name.txt
+  echo "Machine dumps taken"
+  echo "All configurations of projects, nodes, machine are saved in $clustername-$clusterversion-$s11 directory"
+}
+################################### Block 1 project annotation and labels #########################################
+proj_anon_lab()
+{
+ for compfile in `ls $dir01/project`
+  do
+   IFS=''
+   SET_LOCK_ANNOTATION=0
+   SET_LOCK_LABELS=0
+   while read line;
+
+   do
+    PARSE1=`echo "$line" | grep "  $field01:" | wc -l`
+    PARSE2=`echo "$line" | grep "  $field02:" | wc -l`
+    PARSE3=`echo "$line" | grep "$denyfield01:" | wc -l`
+
+    indent00=`echo "$line" | tr -cd ' \t' | wc -c`
+        if [ $SET_LOCK_ANNOTATION = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_ANNOTATION=0
+        fi
+        if [ $SET_LOCK_LABELS = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_LABELS=0
+        fi
+    if [ $PARSE1 = 1 ]; then
+    #################################
+    SET_LOCK_ANNOTATION=1
+    #################################
+    fi
+        if [ $PARSE2 = 1 ]; then
+    #################################
+    SET_LOCK_LABELS=1
+    #################################
+    fi
+
+    if [ $SET_LOCK_ANNOTATION = 1 ] && [ $PARSE3 != 1 ]; then
+    #################################
+    indent01=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent01 = 5 ]; then
+          echo "$line" >> $workdir/project/$compfile.$dir01.annotation
+     fi
+    fi
+
+    if [ $SET_LOCK_LABELS = 1 ]; then
+    #################################
+    indent02=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent02 = 5 ]; then
+      echo "$line" >> $workdir/project/$compfile.$dir01.labels
+     fi
+    fi
+
+
+   done < $dir01/project/$compfile
+
+   IFS=''
+   SET_LOCK_ANNOTATION=0
+   SET_LOCK_LABELS=0
+   while read line;
+
+   do
+    PARSE1=`echo "$line" | grep "  $field01:" | wc -l`
+    PARSE2=`echo "$line" | grep "  $field02:" | wc -l`
+    PARSE3=`echo "$line" | grep "$denyfield01:" | wc -l`
+
+    indent00=`echo "$line" | tr -cd ' \t' | wc -c`
+        if [ $SET_LOCK_ANNOTATION = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_ANNOTATION=0
+        fi
+        if [ $SET_LOCK_LABELS = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_LABELS=0
+        fi
+
+    if [ $PARSE1 = 1 ]; then
+    #################################
+    SET_LOCK_ANNOTATION=1
+    #################################
+    fi
+        if [ $PARSE2 = 1 ]; then
+    #################################
+    SET_LOCK_LABELS=1
+    #################################
+    fi
+
+    if [ $SET_LOCK_ANNOTATION = 1 ] && [ $PARSE3 != 1 ]; then
+    #################################
+    indent01=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent01 = 5 ]; then
+      echo "$line" >> $workdir/project/$compfile.$dir02.annotation
+     fi
+    fi
+
+        if [ $SET_LOCK_LABELS = 1 ]; then
+    #################################
+    indent02=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent02 = 5 ]; then
+      echo "$line" >> $workdir/project/$compfile.$dir02.labels
+     fi
+    fi
+
+   done < $dir02/project/$compfile
+  done
+}
+###################
+
+################################### Block 2 node annotation and labels #########################################
+node_anon_lab()
+{
+ for nodefile in `ls $dir01/node`
+  do
+   IFS=''
+   SET_LOCK_ANNOTATION=0
+   SET_LOCK_LABELS=0
+
+   while read line;
+
+   do
+    PARSE1=`echo "$line" | grep "  $field01:" | wc -l`
+    PARSE2=`echo "$line" | grep "  $field02:" | wc -l`
+    PARSE3=`echo "$line" | grep "$denyfield01:" | wc -l`
+
+    indent00=`echo "$line" | tr -cd ' \t' | wc -c`
+        if [ $SET_LOCK_ANNOTATION = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_ANNOTATION=0
+        fi
+        if [ $SET_LOCK_LABELS = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_LABELS=0
+        fi
+    if [ $PARSE1 = 1 ]; then
+    #################################
+    SET_LOCK_ANNOTATION=1
+    #################################
+    fi
+        if [ $PARSE2 = 1 ]; then
+    #################################
+    SET_LOCK_LABELS=1
+    #################################
+    fi
+
+    if [ $SET_LOCK_ANNOTATION = 1 ] && [ $PARSE3 != 1 ]; then
+    #################################
+    indent01=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent01 = 5 ]; then
+          echo "$line" >> $workdir/node/$nodefile.$dir01.annotation
+     fi
+    fi
+
+    if [ $SET_LOCK_LABELS = 1 ]; then
+    #################################
+    indent02=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent02 = 5 ]; then
+      echo "$line" >> $workdir/node/$nodefile.$dir01.labels
+     fi
+    fi
+   done < $dir01/node/$nodefile
+
+   IFS=''
+   SET_LOCK_ANNOTATION=0
+   SET_LOCK_LABELS=0
+   while read line;
+
+   do
+    PARSE1=`echo "$line" | grep "  $field01:" | wc -l`
+    PARSE2=`echo "$line" | grep "  $field02:" | wc -l`
+    PARSE3=`echo "$line" | grep "$denyfield01:" | wc -l`
+
+    indent00=`echo "$line" | tr -cd ' \t' | wc -c`
+        if [ $SET_LOCK_ANNOTATION = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_ANNOTATION=0
+        fi
+        if [ $SET_LOCK_LABELS = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_LABELS=0
+        fi
+
+    if [ $PARSE1 = 1 ]; then
+    #################################
+    SET_LOCK_ANNOTATION=1
+    #################################
+    fi
+        if [ $PARSE2 = 1 ]; then
+    #################################
+    SET_LOCK_LABELS=1
+    #################################
+    fi
+
+    if [ $SET_LOCK_ANNOTATION = 1 ] && [ $PARSE3 != 1 ]; then
+    #################################
+    indent01=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent01 = 5 ]; then
+      echo "$line" >> $workdir/node/$nodefile.$dir02.annotation
+     fi
+    fi
+
+        if [ $SET_LOCK_LABELS = 1 ]; then
+    #################################
+    indent02=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent02 = 5 ]; then
+      echo "$line" >> $workdir/node/$nodefile.$dir02.labels
+     fi
+    fi
+
+   done < $dir02/node/$nodefile
+  done
+}
+###################
+
+################################### Block 2 machine annotation and labels #########################################
+mach_anon_lab()
+{
+ for machfile in `ls $dir01/machine`
+  do
+   IFS=''
+   SET_LOCK_ANNOTATION=0
+   SET_LOCK_LABELS=0
+
+   while read line;
+
+   do
+    PARSE1=`echo "$line" | grep "  $field01:" | wc -l`
+    PARSE2=`echo "$line" | grep "  $field02:" | wc -l`
+    PARSE3=`echo "$line" | grep "$denyfield01:" | wc -l`
+
+    indent00=`echo "$line" | tr -cd ' \t' | wc -c`
+        if [ $SET_LOCK_ANNOTATION = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_ANNOTATION=0
+        fi
+        if [ $SET_LOCK_LABELS = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_LABELS=0
+        fi
+    if [ $PARSE1 = 1 ]; then
+    #################################
+    SET_LOCK_ANNOTATION=1
+    #################################
+    fi
+        if [ $PARSE2 = 1 ]; then
+    #################################
+    SET_LOCK_LABELS=1
+    #################################
+    fi
+
+    if [ $SET_LOCK_ANNOTATION = 1 ] && [ $PARSE3 != 1 ]; then
+    #################################
+    indent01=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent01 = 5 ]; then
+          echo "$line" >> $workdir/machine/$machfile.$dir01.annotation
+     fi
+    fi
+
+    if [ $SET_LOCK_LABELS = 1 ]; then
+    #################################
+    indent02=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent02 = 5 ]; then
+      echo "$line" >> $workdir/machine/$machfile.$dir01.labels
+     fi
+    fi
+   done < $dir01/machine/$machfile
+
+   IFS=''
+   SET_LOCK_ANNOTATION=0
+   SET_LOCK_LABELS=0
+   while read line;
+
+   do
+    PARSE1=`echo "$line" | grep "  $field01:" | wc -l`
+    PARSE2=`echo "$line" | grep "  $field02:" | wc -l`
+    PARSE3=`echo "$line" | grep "$denyfield01:" | wc -l`
+
+    indent00=`echo "$line" | tr -cd ' \t' | wc -c`
+        if [ $SET_LOCK_ANNOTATION = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_ANNOTATION=0
+        fi
+        if [ $SET_LOCK_LABELS = 1 ] && [ $indent00 = 2 ]; then
+         SET_LOCK_LABELS=0
+        fi
+
+    if [ $PARSE1 = 1 ]; then
+    #################################
+    SET_LOCK_ANNOTATION=1
+    #################################
+    fi
+        if [ $PARSE2 = 1 ]; then
+    #################################
+    SET_LOCK_LABELS=1
+    #################################
+    fi
+
+    if [ $SET_LOCK_ANNOTATION = 1 ] && [ $PARSE3 != 1 ]; then
+    #################################
+    indent01=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent01 = 5 ]; then
+      echo "$line" >> $workdir/machine/$machfile.$dir02.annotation
+     fi
+    fi
+
+        if [ $SET_LOCK_LABELS = 1 ]; then
+    #################################
+    indent02=`echo "$line" | tr -cd ' \t' | wc -c`
+    #################################
+     if [ $indent02 = 5 ]; then
+      echo "$line" >> $workdir/machine/$machfile.$dir02.labels
+     fi
+    fi
+
+   done < $dir02/machine/$machfile
+  done
+}
+###################
+config_compare()
+{
+folder01=`cat $dir01/comp-folder.txt | head -1`
+folder02=`cat $dir01/comp-folder.txt | tail -1`
+
+for opt in project node machine
+do
+for anon in `ls $dir01/$opt | grep $folder01 | grep annotation`
+ do
+  filename=`echo $anon | cut -d "." -f 1,2,3`
+  compfilestatus=`ls $dir01/$opt | grep $filename | grep $folder02 | grep annotation | wc -l`
+  if [ ! -z $compfilestatus ]; then
+   diff_status=`diff $dir01/$opt/$anon $dir01/$opt/$filename.$folder02.annotation | wc -l`
+   if [ $diff_status = 0 ]; then
+	echo "[MSG $opt-annotation SUCCESS]: $filename is matched after the upgrade" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $dir01/logreport-$s11.txt
+   else
+    echo "[MSG $opt-annotation FAILED]: $filename is not matched after the upgrade" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $dir01/logreport-$s11.txt
+   fi	 
+  else
+   echo "[MSG $opt-annotation FAILED]: $filename file not found in second configuration" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $dir01/logreport-$s11.txt 
+  fi
+ done 
+ 
+for labe in `ls $dir01/$opt | grep $folder01 | grep labels`
+ do
+  filename=`echo $labe | cut -d "." -f 1,2,3`
+  compfilestatus=`ls $dir01/$opt | grep $filename | grep $folder02 | grep labels | wc -l`
+  if [ ! -z $compfilestatus ]; then
+   diff_status=`diff $dir01/$opt/$labe $dir01/$opt/$filename.$folder02.labels | wc -l`
+   if [ $diff_status = 0 ]; then
+	echo "[MSG $opt-labels SUCCESS]: $filename is matched after the upgrade" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $dir01/logreport-$s11.txt
+   else
+    echo "[MSG $opt-labels FAILED]: $filename is not matched after the upgrade" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $dir01/logreport-$s11.txt
+   fi	 
+  else
+   echo "[MSG $opt-labels FAILED]: $filename file not found in second configuration" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $dir01/logreport-$s11.txt 
+  fi
+ done 
+done 
+ 
+  echo "report is saved as $dir01/logreport-$s11.txt"
+  cat $dir01/logreport-$s11.txt
+}
+###################
+if [ $1 == "config-dump" ]; then
+ LOGIN_STATUS=`oc cluster-info 2>/dev/null | head -1 | grep http | wc -l`
+ if [ $LOGIN_STATUS != 0 ]; then
+  export clustername=`oc cluster-info | head -1 | awk '{print $NF}' | cut -d "/" -f 3 | cut -d ":" -f 1`
+  export clusterversion=`oc get clusterversion | tail -1 | awk '{print $2}'`
+  config_dump
+ else
+  echo "You must Logged in before taking config dump"
+ fi 
+fi
+
+if [ $1 == "config-gen" ]; then
+ mkdir $workdir
+ echo $dir01 > $workdir/comp-folder.txt
+ echo $dir02 >> $workdir/comp-folder.txt
+ ./$0 config-gen-project $dir01 $dir02
+ ./$0 config-gen-node $dir01 $dir02
+ ./$0 config-gen-machine $dir01 $dir02
+ echo "All annotations and labels are saved in $workdir, Do you want to contineu with compare"
+ read -p "Enter the value yes/no: " selector
+  if [ $selector == "yes" ]; then
+   echo "starting comparison"
+  fi
+fi
+
+if [ $1 == "config-gen-project" ]; then
+ mkdir -p $workdir/project
+ proj_anon_lab
+fi
+
+if [ $1 == "config-gen-node" ]; then
+ mkdir -p $workdir/node
+ node_anon_lab
+fi
+
+if [ $1 == "config-gen-machine" ]; then
+ mkdir -p $workdir/machine
+ mach_anon_lab
+fi
+
+if [ $1 == "config-compare" ]; then
+ config_compare
+fi
+###################
