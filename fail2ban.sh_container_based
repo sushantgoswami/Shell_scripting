@@ -1,0 +1,85 @@
+#!/bin/bash
+
+## Written by Sushant dated 29-12-2024 ##
+## /daily-backup/scripts/fail2ban.sh megamax01-internal-prd megamaxaviation.com 1000 first ##
+## /daily-backup/scripts/fail2ban.sh megamax01-internal-prd megamaxaviation.com 1000 second ##
+
+LOGFILE=/var/log/httpd/httpd_access_log
+CONTAINER=$1
+DOMAIN=$2
+GETLIMIT=$3
+POSTLIMIT=$4
+HEADLIMIT=$5
+SLOT=$6
+PARSEFILE=/tmp/parsefile-$DOMAIN
+WRITEFLAG=0
+MDOMAIN=${DOMAIN}'_'
+LOGFILE1=/var/log/fail2ban.log
+>$PARSEFILE
+>/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-fail2ban
+>/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-firewalled
+cp -rf /etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf.orig /etc/httpd/conf.d/$CONTAINER/${MDOMAIN}443.conf
+systemctl reload httpd
+
+if [ $SLOT == "first" ]; then
+ AA=0; BB=1; CC=2
+fi
+
+if [ $SLOT == "second" ]; then
+ AA=3; BB=4; CC=5
+fi
+
+if [ $SLOT == "first" ] || [ $SLOT == "second" ]; then
+ day=$(date | awk '{print $3}');  mon=$(date | awk '{print $2}'); year=$(date | awk '{print $6}'); hour=$(date | awk '{print $4}' | cut -d ":" -f1)
+ cat $LOGFILE | grep "$day/$mon/$year:$hour:$AA" | grep $DOMAIN | grep "GET " | awk '{print $2}' | sort | uniq -c | sort -nr > $PARSEFILE-GET
+ cat $LOGFILE | grep "$day/$mon/$year:$hour:$BB" | grep $DOMAIN | grep "GET " | awk '{print $2}' | sort | uniq -c | sort -nr >> $PARSEFILE-GET
+ cat $LOGFILE | grep "$day/$mon/$year:$hour:$CC" | grep $DOMAIN | grep "GET " | awk '{print $2}' | sort | uniq -c | sort -nr >> $PARSEFILE-GET
+  while IFS='' read -r line; do
+    num=`echo $line | awk '{print $1}'`
+    ip=`echo $line | awk '{print $2}'`
+    if [ $num -gt $GETLIMIT ]; then
+     echo "      Require not ip $ip" >> "/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-fail2ban"
+     echo "[Blocked] $ip GET Limit $GETLIMIT on $DOMAIN on container $CONTAINER" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $LOGFILE1
+     WRITEFLAG=1
+    fi
+  done < $PARSEFILE-GET
+ cat $LOGFILE | grep "$day/$mon/$year:$hour:$AA" | grep $DOMAIN | grep "POST " | awk '{print $2}' | sort | uniq -c | sort -nr > $PARSEFILE-POST
+ cat $LOGFILE | grep "$day/$mon/$year:$hour:$BB" | grep $DOMAIN | grep "POST " | awk '{print $2}' | sort | uniq -c | sort -nr >> $PARSEFILE-POST
+ cat $LOGFILE | grep "$day/$mon/$year:$hour:$CC" | grep $DOMAIN | grep "POST " | awk '{print $2}' | sort | uniq -c | sort -nr >> $PARSEFILE-POST
+  while IFS='' read -r line; do
+    num=`echo $line | awk '{print $1}'`
+    ip=`echo $line | awk '{print $2}'`
+    if [ $num -gt $POSTLIMIT ]; then
+     echo "      Require not ip $ip" >> "/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-fail2ban"
+     echo "[Blocked] $ip POST Limit $POSTLIMIT on $DOMAIN on container $CONTAINER" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $LOGFILE1
+     WRITEFLAG=1
+    fi
+  done < $PARSEFILE-POST
+ cat $LOGFILE | grep "$day/$mon/$year:$hour:$AA" | grep $DOMAIN | grep "HEAD " | awk '{print $2}' | sort | uniq -c | sort -nr > $PARSEFILE-HEAD
+ cat $LOGFILE | grep "$day/$mon/$year:$hour:$BB" | grep $DOMAIN | grep "HEAD " | awk '{print $2}' | sort | uniq -c | sort -nr >> $PARSEFILE-HEAD
+ cat $LOGFILE | grep "$day/$mon/$year:$hour:$CC" | grep $DOMAIN | grep "HEAD " | awk '{print $2}' | sort | uniq -c | sort -nr >> $PARSEFILE-HEAD
+  while IFS='' read -r line; do
+    num=`echo $line | awk '{print $1}'`
+    ip=`echo $line | awk '{print $2}'`
+    if [ $num -gt $HEADLIMIT ]; then
+     echo "      Require not ip $ip" >> "/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-fail2ban"
+     echo "[Blocked] $ip HEAD Limit $HEADLIMIT on $DOMAIN on container $CONTAINER" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $LOGFILE1
+     WRITEFLAG=1
+    fi
+  done < $PARSEFILE-HEAD
+fi
+
+prepare_file()
+{
+ cat "/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-part1" > "/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-firewalled"
+ cat "/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-fail2ban" >> "/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-firewalled"
+ cat "/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-part2" >> "/etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-firewalled"
+}
+
+if [ $WRITEFLAG == 1 ]; then
+ prepare_file
+ cp -rf /etc/httpd/conf.d/$CONTAINER/fail2ban-templates/${MDOMAIN}443.conf-firewalled /etc/httpd/conf.d/$CONTAINER/${MDOMAIN}443.conf
+ systemctl reload httpd
+else
+ echo "[Unblocked] all IP on $DOMAIN on container $CONTAINER" | sed -e "s/^/$(date | awk '{print $3"-"$2"-"$6"-"$4}') /" >> $LOGFILE1
+fi
